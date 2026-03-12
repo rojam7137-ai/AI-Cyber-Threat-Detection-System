@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<div class="container mt-4">
+
+<h2 class="dashboard-title">AI Threat Intelligence Dashboard</h2>
+
+<div id="stats"
+data-threats="{{ threats|default:0 }}"
+data-safe="{{ safe|default:0 }}"
+data-total="{{ total_logs|default:0 }}">
+</div>
+
+<!-- DASHBOARD CARDS -->
+
+<div class="row mb-4">
+
+<div class="col-md-3">
+<div class="card cyber-card text-center p-3">
+<h6 class="card-title">Total Logs</h6>
+<h2 class="card-number">{{ total_logs }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card cyber-card text-center p-3">
+<h6 class="card-title">Threats</h6>
+<h2 class="card-number threat-number">{{ threats }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card cyber-card text-center p-3">
+<h6 class="card-title">Safe Traffic</h6>
+<h2 class="card-number safe-number">{{ safe }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card cyber-card text-center p-3">
+<h6 class="card-title">AI Confidence</h6>
+<h2 class="card-number">{{ confidence }}%</h2>
+</div>
+</div>
+
+</div>
+
+
+<!-- AI PREDICTION PANEL -->
+
+<div class="row mb-4">
+
+<div class="col-md-12">
+
+<div class="card cyber-card p-4 text-center">
+
+<h4>AI Threat Prediction</h4>
+
+<h5 id="attackType" style="color:#ff3b3b;">DDoS Attack</h5>
+
+<p>Risk Probability:
+<span id="riskProbability" style="color:#00e6ff;font-size:22px;">82%</span>
+</p>
+
+<p>Threat Level:
+<span id="riskLevel" style="color:#ff3b3b;font-weight:bold;">HIGH</span>
+</p>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- AI SECURITY ANALYST -->
+
+<div class="row mb-4">
+
+<div class="col-md-12">
+
+<div class="card cyber-card p-4">
+
+<h4>🤖 AI Security Analyst</h4>
+
+<p style="color:#00e6ff;font-size:16px;">
+{{ ai_analysis }}
+</p>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- TRAFFIC ANALYSIS -->
+
+<div class="row mb-4">
+
+<div class="col-md-6">
+
+<div class="card cyber-card p-4">
+
+<h4>Network Traffic Analysis</h4>
+
+<form method="POST">
+
+{% csrf_token %}
+
+<label>Duration</label>
+<input type="number" name="duration" class="form-control mb-3" required>
+
+<label>Source Bytes</label>
+<input type="number" name="src_bytes" class="form-control mb-3" required>
+
+<label>Destination Bytes</label>
+<input type="number" name="dst_bytes" class="form-control mb-3" required>
+
+<label>Protocol</label>
+<select name="protocol" class="form-control mb-3">
+<option value="0">TCP</option>
+<option value="1">UDP</option>
+</select>
+
+<button class="btn btn-info w-100">Analyze Traffic</button>
+
+</form>
+
+{% if result %}
+
+<div class="alert alert-warning mt-3 text-center">
+<h4>{{ result }}</h4>
+</div>
+
+{% endif %}
+
+</div>
+
+</div>
+
+
+
+<div class="col-md-6">
+
+<div class="card cyber-card p-4">
+
+<h4>Threat Meter</h4>
+
+<canvas id="threatMeter"></canvas>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- CYBER INTELLIGENCE -->
+
+<div class="row mb-4">
+
+<div class="col-md-6">
+
+<div class="card cyber-card p-4">
+
+<h4>Top Attacking Countries</h4>
+
+<canvas id="countryChart"></canvas>
+
+</div>
+
+</div>
+
+
+
+<div class="col-md-6">
+
+<div class="card cyber-card p-4">
+
+<h4>Threat Radar</h4>
+
+<canvas id="radarChart"></canvas>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- CYBER ATTACK MAP -->
+
+<div class="row mb-4">
+
+<div class="col-md-12">
+
+<div class="card cyber-card p-4">
+
+<h4>Global Cyber Attack Monitor</h4>
+
+<div id="cyberMap" style="height:420px;border-radius:10px;"></div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- LIVE TRAFFIC TABLE -->
+
+<div class="row">
+
+<div class="col-md-12">
+
+<div class="card cyber-card p-4">
+
+<h4 class="mb-3 cyber-heading">⚡ Live Traffic Monitor</h4>
+
+<div style="max-height:350px;overflow-y:auto">
+
+<table class="cyber-table">
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Duration</th>
+<th>Src Bytes</th>
+<th>Dst Bytes</th>
+<th>Protocol</th>
+<th>Attacker IP</th>
+<th>Status</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for log in logs %}
+
+<tr class="log-row">
+
+<td>{{ log.id }}</td>
+<td>{{ log.duration }}</td>
+<td>{{ log.src_bytes }}</td>
+<td>{{ log.dst_bytes }}</td>
+<td>{{ log.protocol }}</td>
+<td>{{ log.attacker_ip }}</td>
+
+<td>
+
+{% if "Threat" in log.result %}
+
+<span class="status-threat">⚠ THREAT</span>
+
+{% else %}
+
+<span class="status-safe">✔ SAFE</span>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<script>
+
+const stats=document.getElementById("stats")
+
+const threats=Number(stats.dataset.threats)
+
+const safe=Number(stats.dataset.safe)
+
+
+
+new Chart(document.getElementById("threatMeter"),{
+
+type:"doughnut",
+
+data:{
+
+labels:["Threat","Safe"],
+
+datasets:[{
+
+data:[threats,safe],
+
+backgroundColor:["#ff3b3b","#1aff8c"]
+
+}]
+
+}
+
+})
+
+
+
+new Chart(document.getElementById("countryChart"),{
+
+type:"bar",
+
+data:{
+
+labels:["China","Russia","USA","Germany","Iran"],
+
+datasets:[{
+
+label:"Attack Sources",
+
+data:[12,9,6,5,4],
+
+backgroundColor:"#00e6ff"
+
+}]
+
+}
+
+})
+
+
+
+new Chart(document.getElementById("radarChart"),{
+
+type:"radar",
+
+data:{
+
+labels:["DDoS","Botnet","Exploit","Malware","Phishing"],
+
+datasets:[{
+
+label:"Threat Level",
+
+data:[70,65,50,80,60],
+
+borderColor:"#00e6ff",
+
+backgroundColor:"rgba(0,230,230,0.2)"
+
+}]
+
+}
+
+})
+
+
+
+var map=L.map('cyberMap',{zoomControl:false}).setView([20,0],2)
+
+L.tileLayer(
+'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+).addTo(map)
+
+var attackPoints=[
+[55.75,37.61],
+[35.86,104.19],
+[37.09,-95.71],
+[20.59,78.96],
+[51.16,10.45],
+[35.68,139.69]
+]
+
+function launchCyberAttack(){
+
+var point=attackPoints[Math.floor(Math.random()*attackPoints.length)]
+
+var pulse=L.circle(point,{
+color:'#ff0033',
+fillColor:'#ff0033',
+fillOpacity:0.5,
+radius:300000
+}).addTo(map)
+
+setTimeout(function(){
+map.removeLayer(pulse)
+},2000)
+
+}
+
+setInterval(launchCyberAttack,2000)
+
+
+
+var attacks=["DDoS Attack","Botnet Activity","Malware Injection","Phishing Campaign","Port Scanning"]
+
+function updatePrediction(){
+
+var attack=attacks[Math.floor(Math.random()*attacks.length)]
+
+var probability=Math.floor(Math.random()*40)+60
+
+document.getElementById("attackType").innerText=attack
+
+document.getElementById("riskProbability").innerText=probability+"%"
+
+}
+
+setInterval(updatePrediction,4000)
+
+
+
+/* AUTO REFRESH DASHBOARD */
+
+setTimeout(function(){
+location.reload();
+},5000)
+
+</script>
+
+{% endblock %}
