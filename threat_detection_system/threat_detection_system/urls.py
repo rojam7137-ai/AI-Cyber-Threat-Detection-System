@@ -1,11 +1,12 @@
 from django.contrib import admin
-from django.urls import path
-from detector import views
+from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('', views.home, name='home'),
-    path('history/', views.history, name='history'),
-    path('detect_attack/', views.detect_attack, name='detect_attack'),
+    # login/logout routes
+    path('', include('accounts.urls')),
+
+    # dashboard and attack detection
+    path('', include('detector.urls')),
 ]
