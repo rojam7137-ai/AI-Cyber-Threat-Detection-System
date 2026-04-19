@@ -16,7 +16,7 @@ from .models import TrafficLog
 # GEMINI API CONFIG
 # ================================
 
-client = genai.Client(api_key="YOUR_GEMINI_API_KEY")
+client = genai.Client(api_key="AIzaSyA_6IK1DrlszJzBmuQ-ua2YcYavVN0XTEg")
 
 
 # ================================
@@ -37,7 +37,14 @@ geo_reader = geoip2.database.Reader(
 
 
 # ================================
-# ATTACK TYPE DETECTION FUNCTION
+# BLOCKED IP STORAGE
+# ================================
+
+BLOCKED_IPS = set()
+
+
+# ================================
+# ATTACK TYPE DETECTION
 # ================================
 
 def detect_attack_type(duration, src_bytes, dst_bytes, protocol):
@@ -65,47 +72,11 @@ def detect_attack_type(duration, src_bytes, dst_bytes, protocol):
 
 
 # ================================
-# HOME DASHBOARD
+# HOME
 # ================================
 
 @login_required
 def home(request):
-
-    result = None
-    attack_type = None
-    ai_analysis = None
-
-    if request.method == "POST":
-
-        duration = int(request.POST.get("duration", 0))
-        src_bytes = int(request.POST.get("src_bytes", 0))
-        dst_bytes = int(request.POST.get("dst_bytes", 0))
-        protocol = int(request.POST.get("protocol", 0))
-
-        prediction = model.predict([[duration, src_bytes, dst_bytes, protocol]])
-
-        if prediction[0] == 1:
-            result = "Threat Detected"
-            attack_type = detect_attack_type(duration, src_bytes, dst_bytes, protocol)
-            ai_analysis = f"Potential {attack_type} detected based on unusual traffic behaviour."
-
-        else:
-            result = "Normal Traffic"
-            attack_type = "Normal Traffic"
-            ai_analysis = "Traffic appears normal."
-
-        ip = request.META.get("REMOTE_ADDR")
-
-        TrafficLog.objects.create(
-            duration=duration,
-            src_bytes=src_bytes,
-            dst_bytes=dst_bytes,
-            protocol=protocol,
-            attack_type=attack_type,
-            result=result,
-            ai_analysis=ai_analysis,
-            attacker_ip=ip
-        )
 
     logs = TrafficLog.objects.all().order_by("-id")[:100]
 
@@ -113,7 +84,12 @@ def home(request):
     threats = TrafficLog.objects.filter(result="Threat Detected").count()
     safe = TrafficLog.objects.filter(result="Normal Traffic").count()
 
-    latest = TrafficLog.objects.last()
+    latest_threat = TrafficLog.objects.filter(result="Threat Detected").last()
+
+    if latest_threat:
+        ai_analysis = latest_threat.ai_analysis
+    else:
+        ai_analysis = "No threats detected."
 
     context = {
         "logs": logs,
@@ -121,8 +97,7 @@ def home(request):
         "threats": threats,
         "safe": safe,
         "confidence": 94,
-        "result": result,
-        "ai_analysis": latest.ai_analysis if latest else ""
+        "ai_analysis": ai_analysis
     }
 
     return render(request, "home.html", context)
@@ -135,8 +110,16 @@ def home(request):
 @csrf_exempt
 def detect_attack(request):
 
-    if request.method == "GET":
-        return JsonResponse({"message": "Attack detection API running"})
+    ip = request.META.get("REMOTE_ADDR")
+
+    # 🚫 BLOCK CHECK
+    if ip in BLOCKED_IPS:
+        return JsonResponse({
+            "result": "Blocked",
+            "attack_type": "IP Blocked",
+            "ai_analysis": "This IP has been blocked due to repeated attacks.",
+            "ip": ip
+        })
 
     if request.method == "POST":
 
@@ -147,15 +130,35 @@ def detect_attack(request):
         dst_bytes = int(request.POST.get("dst_bytes", 0))
         protocol = int(request.POST.get("protocol", 0))
 
-        # ================================
-        # REAL SQL INJECTION DETECTION
-        # ================================
-
         if query:
-            q = query.upper()
+            q = query.upper().strip()
 
-            if "SELECT" in q or "UNION" in q or "DROP" in q or "' OR '1'='1" in q:
+            if any(x in q for x in ["SELECT", "UNION", "DROP", " OR ", "--"]):
                 attack_type = "SQL Injection"
+                result = "Threat Detected"
+
+            elif "<SCRIPT>" in q or "ALERT(" in q:
+                attack_type = "XSS Attack"
+                result = "Threat Detected"
+
+            elif any(x in q for x in ["BOT", "COMMAND", "C2"]):
+                attack_type = "Botnet Attack"
+                result = "Threat Detected"
+
+            elif any(x in q for x in ["BANK", "PASSWORD", "LOGIN"]):
+                attack_type = "Phishing Attack"
+                result = "Threat Detected"
+
+            elif any(x in q for x in ["DOWNLOAD", "EXECUTE", ".EXE"]):
+                attack_type = "Malware Communication"
+                result = "Threat Detected"
+
+            elif any(x in q for x in ["EXPLOIT", "PAYLOAD"]):
+                attack_type = "Exploit Attack"
+                result = "Threat Detected"
+
+            elif any(x in q for x in ["&&", ";", "|", "WHOAMI", "CAT", "LS"]):
+                attack_type = "Command Injection"
                 result = "Threat Detected"
 
             else:
@@ -163,59 +166,37 @@ def detect_attack(request):
                 result = "Normal Traffic"
 
         else:
-
             prediction = model.predict([[duration, src_bytes, dst_bytes, protocol]])
 
             if prediction[0] == 1:
                 result = "Threat Detected"
                 attack_type = detect_attack_type(duration, src_bytes, dst_bytes, protocol)
-
             else:
                 result = "Normal Traffic"
                 attack_type = "Normal Traffic"
 
-        ip = request.META.get("REMOTE_ADDR")
-
+        # 🌍 GEO LOCATION
         try:
             geo = geo_reader.city(ip)
             country = geo.country.name
         except:
             country = "Unknown"
 
-        prompt = f"""
-Analyze this network traffic.
+        # 🤖 AI RESPONSE
+        if result == "Threat Detected":
+            ai_analysis = f"Suspicious activity detected. Attack classified as {attack_type}."
+        else:
+            ai_analysis = "Traffic appears normal."
 
-Duration: {duration}
-Source Bytes: {src_bytes}
-Destination Bytes: {dst_bytes}
-Protocol: {protocol}
+        # 🧠 BLOCK LOGIC
+        if result == "Threat Detected":
+            attack_count = TrafficLog.objects.filter(attacker_ip=ip, result="Threat Detected").count()
 
-Prediction Result: {result}
-Attack Type: {attack_type}
+            if attack_count >= 3:
+                BLOCKED_IPS.add(ip)
+                ai_analysis += " 🚫 IP has been BLOCKED."
 
-Attacker IP: {ip}
-Country: {country}
-
-Explain if this looks like a cyber attack and why.
-"""
-
-        try:
-
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt
-            )
-
-            ai_analysis = response.text
-
-        except:
-
-            if result == "Threat Detected":
-                ai_analysis = f"Suspicious activity detected. Attack classified as {attack_type}."
-
-            else:
-                ai_analysis = "Traffic appears normal."
-
+        # SAVE LOG
         TrafficLog.objects.create(
             duration=duration,
             src_bytes=src_bytes,
@@ -237,19 +218,17 @@ Explain if this looks like a cyber attack and why.
 
 
 # ================================
-# HISTORY PAGE
+# HISTORY
 # ================================
 
 @login_required
 def history(request):
-
     logs = TrafficLog.objects.all().order_by("-id")
-
     return render(request, "history.html", {"logs": logs})
 
 
 # ================================
-# LIVE DASHBOARD STATS API
+# DASHBOARD API
 # ================================
 
 def dashboard_stats(request):
@@ -258,11 +237,9 @@ def dashboard_stats(request):
     threats = TrafficLog.objects.filter(result="Threat Detected").count()
     safe = TrafficLog.objects.filter(result="Normal Traffic").count()
 
-    data = {
+    return JsonResponse({
         "total_logs": total_logs,
         "threats": threats,
         "safe": safe,
         "confidence": 94
-    }
-
-    return JsonResponse(data)
+    })
