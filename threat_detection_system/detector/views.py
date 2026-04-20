@@ -16,7 +16,7 @@ from .models import TrafficLog
 # GEMINI API CONFIG
 # ================================
 
-client = genai.Client(api_key="AIzaSyA_6IK1DrlszJzBmuQ-ua2YcYavVN0XTEg")
+client = genai.Client(api_key="AIzaSyAIrqN6ghzaJpeZH726S9WECwMffct2kHc")
 
 
 # ================================
