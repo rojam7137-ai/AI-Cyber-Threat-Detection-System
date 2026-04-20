@@ -78,6 +78,39 @@ def detect_attack_type(duration, src_bytes, dst_bytes, protocol):
 @login_required
 def home(request):
 
+    result = None  # ✅ ADDED
+
+    # 🔥 HANDLE MANUAL TRAFFIC INPUT (ADDED)
+    if request.method == "POST":
+
+        duration = int(request.POST.get("duration", 0))
+        src_bytes = int(request.POST.get("src_bytes", 0))
+        dst_bytes = int(request.POST.get("dst_bytes", 0))
+        protocol = int(request.POST.get("protocol", 0))
+
+        prediction = model.predict([[duration, src_bytes, dst_bytes, protocol]])
+
+        if prediction[0] == 1:
+            result = "Threat Detected"
+            attack_type = detect_attack_type(duration, src_bytes, dst_bytes, protocol)
+            ai_analysis = f"Suspicious activity detected. Attack classified as {attack_type}."
+        else:
+            result = "Normal Traffic"
+            attack_type = "Normal Traffic"
+            ai_analysis = "Traffic appears normal."
+
+        # SAVE LOG
+        TrafficLog.objects.create(
+            duration=duration,
+            src_bytes=src_bytes,
+            dst_bytes=dst_bytes,
+            protocol=protocol,
+            attack_type=attack_type,
+            result=result,
+            ai_analysis=ai_analysis,
+            attacker_ip="Manual Input"
+        )
+
     logs = TrafficLog.objects.all().order_by("-id")[:100]
 
     total_logs = TrafficLog.objects.count()
@@ -97,7 +130,8 @@ def home(request):
         "threats": threats,
         "safe": safe,
         "confidence": 94,
-        "ai_analysis": ai_analysis
+        "ai_analysis": ai_analysis,
+        "result": result   # ✅ ADDED
     }
 
     return render(request, "home.html", context)
@@ -175,20 +209,17 @@ def detect_attack(request):
                 result = "Normal Traffic"
                 attack_type = "Normal Traffic"
 
-        # 🌍 GEO LOCATION
         try:
             geo = geo_reader.city(ip)
             country = geo.country.name
         except:
             country = "Unknown"
 
-        # 🤖 AI RESPONSE
         if result == "Threat Detected":
             ai_analysis = f"Suspicious activity detected. Attack classified as {attack_type}."
         else:
             ai_analysis = "Traffic appears normal."
 
-        # 🧠 BLOCK LOGIC
         if result == "Threat Detected":
             attack_count = TrafficLog.objects.filter(attacker_ip=ip, result="Threat Detected").count()
 
@@ -196,7 +227,6 @@ def detect_attack(request):
                 BLOCKED_IPS.add(ip)
                 ai_analysis += " 🚫 IP has been BLOCKED."
 
-        # SAVE LOG
         TrafficLog.objects.create(
             duration=duration,
             src_bytes=src_bytes,

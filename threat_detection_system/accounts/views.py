@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
+from detector.models import TrafficLog   # ✅ Added import
 
 
 def login_view(request):
@@ -12,6 +13,10 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
+
+            # 🔥 Clear previous logs (fresh dashboard for every login)
+            TrafficLog.objects.all().delete()
+
             login(request, user)
             return redirect("home")
 
