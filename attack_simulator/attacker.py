@@ -10,8 +10,8 @@ url = "http://127.0.0.1:8000/detect_attack/"
 sql_injection_payloads = [
     "' OR '1'='1",
     "' OR 1=1 --",
-    "' UNION SELECT username,password FROM users --",
-    "' DROP TABLE users --"
+    "UNION SELECT username,password FROM users",
+    "DROP TABLE users"
 ]
 
 
@@ -29,9 +29,9 @@ exploit_payloads = [
 # Command Injection
 # =========================
 command_injection_payloads = [
+    "&& whoami",
     "; ls",
-    "; cat /etc/passwd",
-    "&& whoami"
+    "cat /etc/passwd"
 ]
 
 
@@ -39,9 +39,9 @@ command_injection_payloads = [
 # Phishing Payload
 # =========================
 phishing_payloads = [
-    "http://fake-login.com",
-    "Enter your password to verify account",
-    "Update your bank details immediately"
+    "ENTER YOUR PASSWORD",
+    "BANK ACCOUNT LOGIN REQUIRED",
+    "VERIFY YOUR LOGIN PASSWORD"
 ]
 
 
@@ -49,9 +49,9 @@ phishing_payloads = [
 # Botnet Communication
 # =========================
 botnet_payloads = [
-    "BOT CONNECT SERVER",
+    "BOT CONNECT",
     "BOT SEND DATA",
-    "BOT RECEIVE COMMAND"
+    "C2 COMMAND EXECUTION"
 ]
 
 
@@ -59,9 +59,9 @@ botnet_payloads = [
 # Malware Communication
 # =========================
 malware_payloads = [
-    "malware.exe downloading payload",
-    "trojan sending system data",
-    "ransomware encrypting files"
+    "DOWNLOAD malware.exe",
+    "EXECUTE trojan.exe",
+    "ransomware.exe encrypting files"
 ]
 
 
@@ -95,7 +95,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Exploit / XSS Attacks ==========\n")
@@ -115,7 +115,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Command Injection ==========\n")
@@ -135,7 +135,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Phishing Attempts ==========\n")
@@ -155,7 +155,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Botnet Communication ==========\n")
@@ -175,7 +175,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Malware Communication ==========\n")
@@ -195,7 +195,7 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
 
 
     print("\n========== Normal Traffic ==========\n")
@@ -215,4 +215,4 @@ while True:
         except Exception as e:
             print("Server not reachable:", e)
 
-        time.sleep(3)
+        time.sleep(2)
