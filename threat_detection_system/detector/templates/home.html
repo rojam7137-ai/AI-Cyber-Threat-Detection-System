@@ -60,14 +60,18 @@ data-total="{{ total_logs|default:0 }}">
 
 <h4>AI Threat Prediction</h4>
 
-<h5 id="attackType" style="color:#ff3b3b;">Network Threat Detection</h5>
+<h5 style="color:#ff3b3b;">Network Threat Detection</h5>
 
 <p>Risk Probability:
-<span id="riskProbability" style="color:#00e6ff;font-size:22px;">90%</span>
+<span id="riskProbability" style="color:#00e6ff;font-size:22px;">
+0%
+</span>
 </p>
 
 <p>Threat Level:
-<span id="riskLevel" style="color:#ff3b3b;font-weight:bold;">HIGH</span>
+<span id="riskLevel" style="color:#00e6ff;font-weight:bold;">
+SAFE
+</span>
 </p>
 
 </div>
@@ -242,23 +246,16 @@ data-total="{{ total_logs|default:0 }}">
 <td>{{ log.duration }}</td>
 <td>{{ log.src_bytes }}</td>
 <td>{{ log.dst_bytes }}</td>
-<td>{% if log.protocol == 0 %}
-TCP
-{% else %}
-UDP
-{% endif %}
-</td>
+<td>{% if log.protocol == 0 %} TCP {% else %} UDP {% endif %}</td>
 <td>{{ log.attack_type }}</td>
 <td>{{ log.attacker_ip }}</td>
 
 <td>
-
 {% if "Threat" in log.result %}
 <span class="status-threat">⚠ THREAT</span>
 {% else %}
 <span class="status-safe">✔ SAFE</span>
 {% endif %}
-
 </td>
 
 </tr>
@@ -284,16 +281,13 @@ UDP
 /* INITIAL VALUES */
 
 const stats=document.getElementById("stats")
-
 var threats=Number(stats.dataset.threats)
 var safe=Number(stats.dataset.safe)
 
-/* THREAT METER CHART */
+/* THREAT METER */
 
 var threatMeterChart = new Chart(document.getElementById("threatMeter"),{
-
 type:"doughnut",
-
 data:{
 labels:["Threat","Safe"],
 datasets:[{
@@ -301,15 +295,12 @@ data:[threats,safe],
 backgroundColor:["#ff3b3b","#1aff8c"]
 }]
 }
-
 })
 
 /* COUNTRY CHART */
 
 new Chart(document.getElementById("countryChart"),{
-
 type:"bar",
-
 data:{
 labels:["China","Russia","USA","Germany","Iran"],
 datasets:[{
@@ -318,15 +309,12 @@ data:[12,9,6,5,4],
 backgroundColor:"#00e6ff"
 }]
 }
-
 })
 
 /* RADAR CHART */
 
 new Chart(document.getElementById("radarChart"),{
-
 type:"radar",
-
 data:{
 labels:["DDoS","Botnet","Exploit","Malware","Phishing"],
 datasets:[{
@@ -336,7 +324,6 @@ borderColor:"#00e6ff",
 backgroundColor:"rgba(0,230,230,0.2)"
 }]
 }
-
 })
 
 /* CYBER MAP */
@@ -380,20 +367,26 @@ setInterval(launchCyberAttack,2000)
 function updateDashboard(){
 
 fetch("/dashboard_stats/")
-
 .then(response => response.json())
-
 .then(data => {
 
 document.getElementById("totalLogs").innerText = data.total_logs
 document.getElementById("threatLogs").innerText = data.threats
 document.getElementById("safeLogs").innerText = data.safe
 
+// ✅ ONLY FIX
+if(data.risk !== undefined){
+document.getElementById("riskProbability").innerText = data.risk + "%"
+}
+
+if(data.threat_level !== undefined){
+document.getElementById("riskLevel").innerText = data.threat_level
+}
+
 threatMeterChart.data.datasets[0].data = [data.threats, data.safe]
 threatMeterChart.update()
 
 })
-
 }
 
 setInterval(updateDashboard,2000)

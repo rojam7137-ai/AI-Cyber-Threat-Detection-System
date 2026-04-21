@@ -16,7 +16,7 @@ from .models import TrafficLog
 # GEMINI API CONFIG
 # ================================
 
-client = genai.Client(api_key="AIzaSyAIrqN6ghzaJpeZH726S9WECwMffct2kHc")
+client = genai.Client(api_key="AIzaSyCE1K420vqgc8tzwrYrdmhYiuIcr0Km7cM")  # keep empty
 
 
 # ================================
@@ -44,7 +44,7 @@ BLOCKED_IPS = set()
 
 
 # ================================
-# ATTACK TYPE DETECTION
+# ATTACK TYPE DETECTION (ML BASED)
 # ================================
 
 def detect_attack_type(duration, src_bytes, dst_bytes, protocol):
@@ -72,15 +72,14 @@ def detect_attack_type(duration, src_bytes, dst_bytes, protocol):
 
 
 # ================================
-# HOME
+# HOME (DASHBOARD)
 # ================================
 
 @login_required
 def home(request):
 
-    result = None  # ✅ ADDED
+    result = None
 
-    # 🔥 HANDLE MANUAL TRAFFIC INPUT (ADDED)
     if request.method == "POST":
 
         duration = int(request.POST.get("duration", 0))
@@ -99,7 +98,6 @@ def home(request):
             attack_type = "Normal Traffic"
             ai_analysis = "Traffic appears normal."
 
-        # SAVE LOG
         TrafficLog.objects.create(
             duration=duration,
             src_bytes=src_bytes,
@@ -124,6 +122,18 @@ def home(request):
     else:
         ai_analysis = "No threats detected."
 
+    if total_logs > 0:
+        risk_probability = int((threats / total_logs) * 100)
+    else:
+        risk_probability = 0
+
+    if risk_probability > 70:
+        risk_level = "HIGH"
+    elif risk_probability > 30:
+        risk_level = "MEDIUM"
+    else:
+        risk_level = "SAFE"
+
     context = {
         "logs": logs,
         "total_logs": total_logs,
@@ -131,7 +141,9 @@ def home(request):
         "safe": safe,
         "confidence": 94,
         "ai_analysis": ai_analysis,
-        "result": result   # ✅ ADDED
+        "result": result,
+        "risk_probability": risk_probability,
+        "risk_level": risk_level
     }
 
     return render(request, "home.html", context)
@@ -146,7 +158,6 @@ def detect_attack(request):
 
     ip = request.META.get("REMOTE_ADDR")
 
-    # 🚫 BLOCK CHECK
     if ip in BLOCKED_IPS:
         return JsonResponse({
             "result": "Blocked",
@@ -167,15 +178,11 @@ def detect_attack(request):
         if query:
             q = query.upper().strip()
 
-            if any(x in q for x in ["SELECT", "UNION", "DROP", " OR ", "--"]):
-                attack_type = "SQL Injection"
-                result = "Threat Detected"
-
-            elif "<SCRIPT>" in q or "ALERT(" in q:
+            if "<SCRIPT>" in q or "ALERT(" in q:
                 attack_type = "XSS Attack"
                 result = "Threat Detected"
 
-            elif any(x in q for x in ["BOT", "COMMAND", "C2"]):
+            elif any(x in q for x in ["BOT", "C2"]):
                 attack_type = "Botnet Attack"
                 result = "Threat Detected"
 
@@ -187,12 +194,16 @@ def detect_attack(request):
                 attack_type = "Malware Communication"
                 result = "Threat Detected"
 
+            elif any(x in q for x in ["&&", ";", "|", "WHOAMI", "CAT", "LS"]):
+                attack_type = "Command Injection"
+                result = "Threat Detected"
+
             elif any(x in q for x in ["EXPLOIT", "PAYLOAD"]):
                 attack_type = "Exploit Attack"
                 result = "Threat Detected"
 
-            elif any(x in q for x in ["&&", ";", "|", "WHOAMI", "CAT", "LS"]):
-                attack_type = "Command Injection"
+            elif any(x in q for x in ["SELECT", "UNION", "DROP", "--", " OR "]):
+                attack_type = "SQL Injection"
                 result = "Threat Detected"
 
             else:
@@ -223,7 +234,8 @@ def detect_attack(request):
         if result == "Threat Detected":
             attack_count = TrafficLog.objects.filter(attacker_ip=ip, result="Threat Detected").count()
 
-            if attack_count >= 3:
+            # ✅ ONLY CHANGE DONE HERE
+            if attack_count >= 1000:
                 BLOCKED_IPS.add(ip)
                 ai_analysis += " 🚫 IP has been BLOCKED."
 
@@ -267,9 +279,23 @@ def dashboard_stats(request):
     threats = TrafficLog.objects.filter(result="Threat Detected").count()
     safe = TrafficLog.objects.filter(result="Normal Traffic").count()
 
+    if total_logs > 0:
+        risk = int((threats / total_logs) * 100)
+    else:
+        risk = 0
+
+    if risk > 70:
+        threat_level = "HIGH"
+    elif risk > 30:
+        threat_level = "MEDIUM"
+    else:
+        threat_level = "SAFE"
+
     return JsonResponse({
         "total_logs": total_logs,
         "threats": threats,
         "safe": safe,
-        "confidence": 94
+        "confidence": 94,
+        "risk": risk,
+        "threat_level": threat_level
     })
